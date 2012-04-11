@@ -77,9 +77,11 @@
     <Compile Include="DocumentInfo.cs" />
     <Compile Include="ProjectInstaller.cs">
       <SubType>Component</SubType>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>
     <Compile Include="ProjectInstaller.Designer.cs">
       <DependentUpon>ProjectInstaller.cs</DependentUpon>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Compile>
     <Compile Include="Service1.cs">
       <SubType>Component</SubType>
@@ -93,6 +95,7 @@
   <ItemGroup>
     <EmbeddedResource Include="ProjectInstaller.resx">
       <DependentUpon>ProjectInstaller.cs</DependentUpon>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Service1.resx">
       <DependentUpon>Service1.cs</DependentUpon>

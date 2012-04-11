@@ -39,6 +39,11 @@
             this.fileSystemWatcher.Filter = "*.pdf";
             this.fileSystemWatcher.Created += new System.IO.FileSystemEventHandler(this.fileSystemWatcher_Created);
             // 
+            // eventLog
+            // 
+            this.eventLog.Log = "Application";
+            this.eventLog.Source = "DocumentBarcodeSplitter";
+            // 
             // Service1
             // 
             this.ServiceName = "Service1";

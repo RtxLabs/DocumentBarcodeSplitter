@@ -24,8 +24,9 @@ Installation
 
 There is no installer or binary package available at the moment, so you have to checkout and compile yourself.
 
+TBD
 
 Usage
 ============
 
-
+TBD

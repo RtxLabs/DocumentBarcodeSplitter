@@ -36,32 +36,42 @@ namespace DocumentBarcodeSplitter
 
         private void fileSystemWatcher_Created(object sender, System.IO.FileSystemEventArgs e)
         {
-            this.Process(e.FullPath);
+            try
+            {
+                this.Process(e.FullPath);
+            }
+            catch (Exception ex)
+            {
+                this.eventLog.WriteEntry(ex.Message+"\n"+ex.StackTrace, EventLogEntryType.Error);
+            }
         }
 
         private void Process(String filePath)
         {
             ArrayList documentInfos = GetDocumentInfos(filePath);
 
-            PdfDocument inputDocument = PdfReader.Open(filePath, PdfDocumentOpenMode.Import);
-
-            String destinationPath = (String)config.GetValue("destPath", typeof(String));
-
-            foreach (DocumentInfo info in documentInfos)
+            if (documentInfos != null)
             {
-                PdfDocument outputDocument = new PdfDocument();
-                outputDocument.Version = inputDocument.Version;
+                PdfDocument inputDocument = PdfReader.Open(filePath, PdfDocumentOpenMode.Import);
 
-                for (int page = info.startPage; page <= info.endPage; page++)
+                String destinationPath = (String)config.GetValue("destPath", typeof(String));
+
+                foreach (DocumentInfo info in documentInfos)
                 {
-                    outputDocument.AddPage(inputDocument.Pages[page]);
+                    PdfDocument outputDocument = new PdfDocument();
+                    outputDocument.Version = inputDocument.Version;
+
+                    for (int page = info.startPage; page <= info.endPage; page++)
+                    {
+                        outputDocument.AddPage(inputDocument.Pages[page]);
+                    }
+
+                    String destinationName = destinationPath + info.barcode + ".pdf";
+                    outputDocument.Save(destinationName);
                 }
 
-                String destinationName = destinationPath + info.barcode + ".pdf";
-                outputDocument.Save(destinationName);
+                File.Delete(filePath);
             }
-
-            File.Delete(filePath);
         }
 
         private ArrayList GetDocumentInfos(String filePath)
@@ -71,42 +81,71 @@ namespace DocumentBarcodeSplitter
             // convert PDF to JPEG using ImageMagick
             String tempPath = (String)config.GetValue("tempPath", typeof(String));
 
+            TimeSpan t = (DateTime.UtcNow - new DateTime(1970, 1, 1));
+            int timestamp = (int)t.TotalSeconds;
+
             String fileName = System.IO.Path.GetFileNameWithoutExtension(filePath);
-            String tempFilePath = tempPath + fileName + ".bmp";
+            String tempFilePath = tempPath + timestamp + ".bmp";
 
             String imageMagickPath = (String)config.GetValue("imageMagickPath", typeof(String));
 
-            Process convert = new Process();
-            convert.StartInfo.FileName = imageMagickPath + "\\convert.exe";
-            convert.StartInfo.Arguments = "-density 200 " + filePath + " " + tempFilePath;
-            convert.Start();
-            convert.WaitForExit();
+            try
+            {
+                Process convert = new Process();
+                convert.StartInfo.FileName = imageMagickPath + "convert.exe";
+                convert.StartInfo.Arguments = "-density 200 " + filePath + " " + tempFilePath;
+                convert.Start();
+                convert.WaitForExit();
+            }
+            catch (Exception ex)
+            {
+                this.eventLog.WriteEntry(ex.Message + "\n" + ex.StackTrace, EventLogEntryType.Error);
+                return null;
+            }
 
             int index = 0;
             DocumentInfo documentInfo = null;
-            while (File.Exists(tempPath + fileName + "-" + index + ".bmp"))
+
+            do
             {
-                String barcode = this.ReadBarcode(tempPath + fileName + "-" + index + ".bmp");
-
-                if (barcode.Length > 0)
+                String file = tempPath + timestamp + "-" + index + ".bmp";
+                if (!File.Exists(file) && index == 0)
                 {
-                    documentInfo = new DocumentInfo(index);
-                    documentInfo.barcode = barcode;
-                    documentInfos.Add(documentInfo);
-                }
-                else if (documentInfo == null)
-                {
-                    documentInfo = new DocumentInfo(index);
-                    documentInfo.barcode = fileName;
-                    documentInfos.Add(documentInfo);
-                }
-                else
-                {
-                    documentInfo.endPage = documentInfo.endPage + 1;
+                    file = tempPath + timestamp + ".bmp";
                 }
 
-                File.Delete(tempPath + fileName + "-" + index + ".bmp");
+                if (File.Exists(file))
+                {
+                    String barcode = this.ReadBarcode(file);
+
+                    if (barcode.Length > 0)
+                    {
+                        documentInfo = new DocumentInfo(index);
+                        documentInfo.barcode = barcode;
+                        documentInfos.Add(documentInfo);
+                    }
+                    else if (documentInfo == null)
+                    {
+                        documentInfo = new DocumentInfo(index);
+                        documentInfo.barcode = fileName;
+                        documentInfos.Add(documentInfo);
+                    }
+                    else
+                    {
+                        documentInfo.endPage = documentInfo.endPage + 1;
+                    }
+
+                    File.Delete(file);
+
+                }
+
                 index++;
+            }
+            while (File.Exists(tempPath + timestamp + "-" + index + ".bmp"));
+
+            if (documentInfos.Count == 0)
+            {
+                this.eventLog.WriteEntry("No temporary file generated for " + fileName, EventLogEntryType.Information);
             }
 
             return documentInfos;
@@ -124,7 +163,7 @@ namespace DocumentBarcodeSplitter
 
             if (barcodes.Count > 0)
             {
-                Regex regex = new Regex(@"^RE-\d+");
+                Regex regex = new Regex((String)config.GetValue("barcodeRegExp", typeof(String)));
                 String barcode = "";
 
                 foreach (String currentBarcode in barcodes)
